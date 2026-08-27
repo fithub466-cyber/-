@@ -41,7 +41,7 @@ local AimbotSettings = {
     StrongLock = false,
     WallCheck = true,
     LockPart = "Head",
-    FOV = 100,
+    FOV = 160,
     ShowFOV = true,
     HideMyNameOnly = true,
     IsAiming = false,
@@ -232,7 +232,7 @@ ExcludeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 ExcludeBtn.Position = UDim2.new(0.53, 0, 0.56, 0)
 ExcludeBtn.Size = UDim2.new(0, 145, 0, 40)
 ExcludeBtn.Font = Enum.Font.SourceSansBold
-ExcludeBtn.Text = "Exclude Menu"
+ExcludeBtn.Text = "ไม่ล็อคเพื่อน"
 ExcludeBtn.TextColor3 = Color3.fromRGB(150, 180, 220)
 ExcludeBtn.TextSize = 14
 Instance.new("UICorner", ExcludeBtn).CornerRadius = UDim.new(0, 8)
@@ -243,14 +243,14 @@ GunModBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 160)
 GunModBtn.Position = UDim2.new(0.05, 0, 0.75, 0)
 GunModBtn.Size = UDim2.new(0.9, 0, 0, 45)
 GunModBtn.Font = Enum.Font.SourceSansBold
-GunModBtn.Text = "⚙️ Open Gun Mods Menu"
+GunModBtn.Text = "⚙️ เมนูปรับปืน "
 GunModBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 GunModBtn.TextSize = 15
 Instance.new("UICorner", GunModBtn).CornerRadius = UDim.new(0, 8)
 
 -- [[ เมนู Exclude ]]
 local ExcludeMenuGui = Instance.new("ScreenGui", CoreGui)
-ExcludeMenuGui.Name = "ExcludeMenuGui"
+ExcludeMenuGui.Name = "เมนูปรับปืน"
 ExcludeMenuGui.IgnoreGuiInset = true
 ExcludeMenuGui.Enabled = false
 
@@ -312,11 +312,11 @@ local function refreshPlayerList()
             local isExcluded = table.find(AimbotSettings.ExcludedPlayers, player.UserId) ~= nil
             if isExcluded then
                 pBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-                pBtn.Text = "❌ [Excluded] " .. player.Name
+                pBtn.Text = "ไม่ล็อค 🟢 [Excluded] " .. player.Name
                 pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             else
                 pBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                pBtn.Text = "✔️ " .. player.Name
+                pBtn.Text = "ล็อค 🔴 " .. player.Name
                 pBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
             end
             
@@ -360,7 +360,7 @@ GunModTitle.BackgroundTransparency = 1
 GunModTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
 GunModTitle.Size = UDim2.new(0.9, 0, 0, 30)
 GunModTitle.Font = Enum.Font.SourceSansBold
-GunModTitle.Text = "Weapon Mod Settings"
+GunModTitle.Text = "ปรับแต่งอาวุร"
 GunModTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 GunModTitle.TextSize = 16
 
@@ -377,7 +377,7 @@ GunModCloseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ระบบปรับแต่งปืน
-getgenv().FireRateValue = 1000
+getgenv().FireRateValue = 3000
 getgenv().AccuracyValue = 1
 getgenv().RecoilValue = 0
 getgenv().Durability = 999999999
