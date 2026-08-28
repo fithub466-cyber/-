@@ -1,4 +1,5 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -6,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ContentProvider = game:GetService("ContentProvider")
 
 -- [[ ระบบป้องกัน: รายชื่อคนที่จะถูกคุ้มครอง ]]
 local protectedNames = {
@@ -35,6 +37,245 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- [[ 2. ระบบ Item ESP Database & System (ปรับแสดงชื่อภาษาอังกฤษยึดติดใต้เท้า) ]]
+local ItemESP_Enabled = true
+local BillboardCache = {}
+local ItemESP_UpdateConnections = {}
+local WeaponDB = {}
+
+local RARITY_COLORS = {
+    ["Common"] = Color3.fromRGB(255, 255, 255),
+    ["Uncommon"] = Color3.fromRGB(99, 255, 52),
+    ["Rare"] = Color3.fromRGB(51, 170, 255),
+    ["Epic"] = Color3.fromRGB(237, 44, 255),
+    ["Legendary"] = Color3.fromRGB(255, 150, 0),
+    ["Omega"] = Color3.fromRGB(255, 20, 51),
+}
+
+local function generateUniqueKey(tool)
+    if not tool or not tool:IsA("Tool") then return nil end
+    local itemId = tool:GetAttribute("ItemId") or tool:GetAttribute("Id")
+    if itemId and itemId ~= "" and (typeof(itemId) == "string" or typeof(itemId) == "number") then
+        return "ITEMID_" .. tostring(itemId)
+    end
+    local partsData = {}
+    for _, part in ipairs(tool:GetDescendants()) do
+        if part:IsA("SpecialMesh") and part.MeshId and part.MeshId ~= "" and part.MeshId ~= "rbxassetid://" then
+            table.insert(partsData, "MESH_"..part.MeshId.."|TEX_"..(part.TextureId or "NOTEX"))
+        elseif part:IsA("MeshPart") and part.MeshId and part.MeshId ~= "" and part.MeshId ~= "rbxassetid://" then
+            table.insert(partsData, "MESH_"..part.MeshId.."|TEX_"..(part.TextureID or "NOTEX"))
+        elseif part:IsA("Decal") and part.Texture and part.Texture ~= "" and part.Texture ~= "rbxassetid://" then
+            table.insert(partsData, "DECAL_"..part.Texture)
+        elseif part:IsA("Part") then
+            table.insert(partsData, "PART_"..part.Name.."_"..part.Size.X.."x"..part.Size.Y.."x"..part.Size.Z)
+        end
+    end
+    if #partsData > 0 then
+        table.sort(partsData)
+        return "MESHKEY_" .. table.concat(partsData, ";")
+    end
+    local displayName = tool:GetAttribute("DisplayName") or tool.Name
+    local toolName = tool.Name
+    local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Unknown"
+    return "NAME_" .. displayName .. "_" .. toolName .. "_" .. rarity
+end
+
+local function registerItems(folder)
+    for _, tool in ipairs(folder:GetDescendants()) do
+        if not tool:IsA("Tool") then continue end
+        local key = generateUniqueKey(tool)
+        if not key then continue end
+        local displayName = tool:GetAttribute("DisplayName") or tool.Name
+        local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Common"
+        WeaponDB[key] = {
+            Name = displayName,
+            Rarity = rarity,
+            ToolName = tool.Name,
+            Key = key
+        }
+    end
+end
+
+pcall(function()
+    local itemsFolder = ReplicatedStorage:WaitForChild("Items", 5)
+    if itemsFolder then registerItems(itemsFolder) end
+    for _, obj in ipairs(ReplicatedStorage:GetChildren()) do
+        if obj:IsA("Folder") and (obj.Name:find("Weapon") or obj.Name:find("Item") or obj.Name:find("Tool")) then
+            registerItems(obj)
+        end
+    end
+    registerItems(game:GetService("StarterPack"))
+end)
+
+local function getWeaponInfo(tool)
+    if not tool or not tool:IsA("Tool") then return nil end
+    local key = generateUniqueKey(tool)
+    return WeaponDB[key] or {
+        Name = tool.Name,
+        Rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Common",
+        ToolName = tool.Name,
+        Key = key
+    }
+end
+
+local function createBillboardForPlayer(player)
+    if player == LocalPlayer or BillboardCache[player] then return end
+    local billboard, container, layout
+    local connections = {}
+
+    local function updateESP()
+        if not ItemESP_Enabled or not billboard or not billboard.Parent then return end
+        local currentTools = {}
+        local function scan(folder)
+            if not folder then return end
+            for _, tool in ipairs(folder:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name ~= "Fists" then
+                    local info = getWeaponInfo(tool)
+                    if info then
+                        table.insert(currentTools, info)
+                    end
+                end
+            end
+        end
+
+        local char = player.Character
+        if char then
+            scan(char)
+            local backpack = player:FindFirstChild("Backpack")
+            if backpack then scan(backpack) end
+        end
+
+        container:ClearAllChildren()
+        
+        layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 2)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.VerticalAlignment = Enum.VerticalAlignment.Top
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = container
+
+        for i, info in ipairs(currentTools) do
+            local txt = Instance.new("TextLabel")
+            txt.Parent = container
+            txt.Size = UDim2.new(1, 0, 0, 12)
+            txt.BackgroundTransparency = 1
+            txt.Font = Enum.Font.SourceSansBold
+            txt.TextSize = 9
+            txt.Text = "[" .. tostring(info.Name) .. "]"
+            txt.LayoutOrder = i
+
+            local color = RARITY_COLORS[info.Rarity] or Color3.fromRGB(255, 255, 255)
+            txt.TextColor3 = color
+            
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(0, 0, 0)
+            stroke.Thickness = 1.5
+            stroke.Parent = txt
+        end
+    end
+
+    local function setupBillboard()
+        local char = player.Character
+        if not char then return end
+
+        -- ค้นหาชิ้นส่วนเท้าเพื่อใช้อิงตำแหน่งโดยตรง (ป้องกันการลอยขึ้นหัวเมื่ออยู่ระยะไกล)
+        local foot = char:FindFirstChild("LeftFoot") 
+            or char:FindFirstChild("RightFoot") 
+            or char:FindFirstChild("Left Leg") 
+            or char:FindFirstChild("Right Leg")
+            or char:FindFirstChild("HumanoidRootPart")
+
+        if not foot then return end
+
+        if BillboardCache[player] then
+            BillboardCache[player]:Destroy()
+        end
+
+        for _, conn in pairs(connections) do
+            if conn.Connected then conn:Disconnect() end
+        end
+        connections = {}
+
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = "ItemESP"
+        billboard.Adornee = foot
+        billboard.Size = UDim2.new(0, 200, 0, 80)
+        
+        -- กำหนดระยะ Offset ใต้เท้า
+        if foot.Name:find("Foot") or foot.Name:find("Leg") then
+            billboard.StudsOffset = Vector3.new(0, -0.5, 0)
+        else
+            billboard.StudsOffset = Vector3.new(0, -3.2, 0)
+        end
+
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        billboard.Parent = foot
+
+        container = Instance.new("Frame", billboard)
+        container.Size = UDim2.new(1, 0, 1, 0)
+        container.BackgroundTransparency = 1
+
+        BillboardCache[player] = billboard
+        updateESP()
+
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            table.insert(connections, backpack.ChildAdded:Connect(updateESP))
+            table.insert(connections, backpack.ChildRemoved:Connect(updateESP))
+        end
+
+        table.insert(connections, char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then task.defer(updateESP) end
+        end))
+
+        table.insert(connections, char.ChildRemoved:Connect(function(child)
+            if child:IsA("Tool") then task.defer(updateESP) end
+        end))
+
+        table.insert(connections, player.ChildAdded:Connect(function(child)
+            if child.Name == "Backpack" then
+                task.wait()
+                table.insert(connections, child.ChildAdded:Connect(updateESP))
+                table.insert(connections, child.ChildRemoved:Connect(updateESP))
+                updateESP()
+            end
+        end))
+    end
+
+    if player.Character then
+        task.spawn(setupBillboard)
+    end
+
+    table.insert(connections, player.CharacterAdded:Connect(function()
+        task.wait(1)
+        setupBillboard()
+    end))
+
+    ItemESP_UpdateConnections[player] = connections
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then createBillboardForPlayer(p) end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then createBillboardForPlayer(p) end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if BillboardCache[p] then
+        BillboardCache[p]:Destroy()
+        BillboardCache[p] = nil
+    end
+    if ItemESP_UpdateConnections[p] then
+        for _, conn in pairs(ItemESP_UpdateConnections[p]) do
+            if conn.Connected then conn:Disconnect() end
+        end
+        ItemESP_UpdateConnections[p] = nil
+    end
+end)
+
 -- [[ ค่าการตั้งค่า Aimbot ]]--
 local AimbotSettings = {
     Enabled = false,
@@ -49,18 +290,10 @@ local AimbotSettings = {
 }
 
 -- ลบ UI เก่าทิ้งก่อนสร้างใหม่
-if CoreGui:FindFirstChild("SimpleAimbotUI") then
-    CoreGui.SimpleAimbotUI:Destroy()
-end
-if CoreGui:FindFirstChild("MobileFOVGui") then
-    CoreGui.MobileFOVGui:Destroy()
-end
-if CoreGui:FindFirstChild("ExcludeMenuGui") then
-    CoreGui.ExcludeMenuGui:Destroy()
-end
-if CoreGui:FindFirstChild("GunModMenuGui") then
-    CoreGui.GunModMenuGui:Destroy()
-end
+if CoreGui:FindFirstChild("SimpleAimbotUI") then CoreGui.SimpleAimbotUI:Destroy() end
+if CoreGui:FindFirstChild("MobileFOVGui") then CoreGui.MobileFOVGui:Destroy() end
+if CoreGui:FindFirstChild("ExcludeMenuGui") then CoreGui.ExcludeMenuGui:Destroy() end
+if CoreGui:FindFirstChild("GunModMenuGui") then CoreGui.GunModMenuGui:Destroy() end
 
 -- สร้าง UI วงกลม FOV
 local FOVGui = Instance.new("ScreenGui", CoreGui)
@@ -707,7 +940,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
         for _, descendant in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if descendant:IsA("BillboardGui") then
+            if descendant:IsA("BillboardGui") and descendant.Name ~= "ItemESP" then
                 descendant.Enabled = not AimbotSettings.HideMyNameOnly
             end
         end
@@ -788,4 +1021,4 @@ task.spawn(function()
     end
 end)
 
-print("Script Loaded with Sliders!")
+print("Script Loaded with Fixed Foot Anchored Text Item ESP!")
