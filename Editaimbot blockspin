@@ -166,7 +166,7 @@ local function createPlayerESP(player)
     local headBillboard = Instance.new("BillboardGui")
     headBillboard.Name = "HeadESP_Gui"
     headBillboard.Size = UDim2.new(0, 200, 0, 25)
-    headBillboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    headBillboard.StudsOffset = Vector3.new(0, 3.0, 0)
     headBillboard.AlwaysOnTop = true
     headBillboard.Enabled = false
 
@@ -182,7 +182,7 @@ local function createPlayerESP(player)
     local footBillboard = Instance.new("BillboardGui")
     footBillboard.Name = "FootESP_Gui"
     footBillboard.Size = UDim2.new(0, 250, 0, 30)
-    footBillboard.StudsOffset = Vector3.new(0, -3.5, 0)
+    footBillboard.StudsOffset = Vector3.new(0, -4.0, 0)
     footBillboard.AlwaysOnTop = true
     footBillboard.Enabled = false
 
