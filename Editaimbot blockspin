@@ -223,7 +223,7 @@ local function createPlayerESP(player)
     boxFrame.Visible = false
 
     local boxStroke = Instance.new("UIStroke", boxFrame)
-    boxStroke.Thickness = 1.5
+    boxStroke.Thickness = 2.5
     boxStroke.Color = Color3.fromRGB(0, 255, 0)
 
     SafeBoxGuiList[player] = {Frame = boxFrame, Stroke = boxStroke}
