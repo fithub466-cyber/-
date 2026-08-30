@@ -39,17 +39,18 @@ end)
 -- [[ 2. ระบบ Item ESP & 3D Highlight ESP (สีตามเลือด) ]]
 local ItemESP_Enabled = true
 local HighlightESP_Enabled = true 
+local BoxESP_Enabled = true 
 local HideCommonItems = true 
 local WeaponDB = {}
 
--- ชุดสีระดับไอเทม (รองรับตัวพิมพ์เล็ก-ใหญ่)
+-- ชุดสีระดับไอเทม
 local RARITY_COLORS = {
-    ["common"] = Color3.fromRGB(160, 160, 160),       -- สีเทา
-    ["uncommon"] = Color3.fromRGB(50, 220, 50),     -- สีเขียว
-    ["rare"] = Color3.fromRGB(50, 150, 255),        -- สีฟ้า/น้ำเงิน
-    ["epic"] = Color3.fromRGB(180, 50, 255),        -- สีม่วง
-    ["legendary"] = Color3.fromRGB(255, 170, 0),     -- สีส้ม/ทอง
-    ["default"] = Color3.fromRGB(255, 255, 255)     -- สีขาว
+    ["common"] = Color3.fromRGB(160, 160, 160),
+    ["uncommon"] = Color3.fromRGB(50, 220, 50),
+    ["rare"] = Color3.fromRGB(50, 150, 255),
+    ["epic"] = Color3.fromRGB(180, 50, 255),
+    ["legendary"] = Color3.fromRGB(255, 170, 0),
+    ["default"] = Color3.fromRGB(255, 255, 255)
 }
 
 local function getRarityColor(rarityStr)
@@ -137,14 +138,15 @@ local function getWeaponInfo(tool)
 end
 
 for _, v in ipairs(CoreGui:GetChildren()) do
-    if v.Name == "PlayerHighlightESP" or v.Name == "ItemESP_ScreenGui" or v.Name == "HeadESP_Gui" or v.Name == "FootESP_Gui" then v:Destroy() end
+    if v.Name == "PlayerHighlightESP" or v.Name == "ItemESP_ScreenGui" or v.Name == "HeadESP_Gui" or v.Name == "FootESP_Gui" or v.Name == "SafeBoxESP" then v:Destroy() end
 end
 
 local Highlights = {}
 local ESPBillboards = {}
+local SafeBoxGuiList = {}
 
 local function getHealthColor(health, maxHealth)
-    local pct = math.clamp(health / maxHealth, 0, 1)
+    local pct = math.clamp(health / (maxHealth > 0 and maxHealth or 100), 0, 1)
     if pct > 0.6 then
         return Color3.fromRGB(0, 255, 0)
     elseif pct > 0.3 then
@@ -154,13 +156,18 @@ local function getHealthColor(health, maxHealth)
     end
 end
 
+local SafeBoxGui = Instance.new("ScreenGui", CoreGui)
+SafeBoxGui.Name = "SafeBoxESP"
+SafeBoxGui.IgnoreGuiInset = true
+
 local function createPlayerESP(player)
     if player == LocalPlayer or ESPBillboards[player] then return end
 
     local headBillboard = Instance.new("BillboardGui")
     headBillboard.Name = "HeadESP_Gui"
-    headBillboard.Size = UDim2.new(0, 200, 0, 30)
-    headBillboard.StudsOffset = Vector3.new(0, 2.2, 0)
+    headBillboard.Size = UDim2.new(0, 200, 0, 25)
+    -- [ปรับแก้] เพิ่มความสูงขึ้นจากเดิมเล็กน้อยเพื่อให้ดูโปร่งขึ้น
+    headBillboard.StudsOffset = Vector3.new(0, 2.3, 0)
     headBillboard.AlwaysOnTop = true
     headBillboard.Enabled = false
 
@@ -168,15 +175,17 @@ local function createPlayerESP(player)
     nameLabel.Name = "NameLabel"
     nameLabel.Size = UDim2.new(1, 0, 1, 0)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.Font = Enum.Font.SourceSansBold
-    nameLabel.TextSize = 13
-    nameLabel.TextStrokeTransparency = 0
+    -- [ปรับแก้] เปลี่ยนฟอนต์ให้บางลง (Gotham ปกติ แทนที่จะเป็น GothamBold)
+    nameLabel.Font = Enum.Font.Gotham
+    -- [ปรับแก้] ลดขนาดตัวอักษรลงเหลือ 10 เพื่อความเล็กและอ่านง่าย
+    nameLabel.TextSize = 10
+    nameLabel.TextStrokeTransparency = 0.4
     nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
     local footBillboard = Instance.new("BillboardGui")
     footBillboard.Name = "FootESP_Gui"
-    footBillboard.Size = UDim2.new(0, 250, 0, 40)
-    footBillboard.StudsOffset = Vector3.new(0, -3.2, 0)
+    footBillboard.Size = UDim2.new(0, 250, 0, 30)
+    footBillboard.StudsOffset = Vector3.new(0, -3.0, 0)
     footBillboard.AlwaysOnTop = true
     footBillboard.Enabled = false
 
@@ -184,9 +193,9 @@ local function createPlayerESP(player)
     itemsLabel.Name = "ItemsLabel"
     itemsLabel.Size = UDim2.new(1, 0, 1, 0)
     itemsLabel.BackgroundTransparency = 1
-    itemsLabel.Font = Enum.Font.SourceSansBold
+    itemsLabel.Font = Enum.Font.GothamBold
     itemsLabel.TextSize = 11
-    itemsLabel.TextStrokeTransparency = 0
+    itemsLabel.TextStrokeTransparency = 0.2
     itemsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     itemsLabel.TextXAlignment = Enum.TextXAlignment.Center
     itemsLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -202,12 +211,22 @@ local function createPlayerESP(player)
     local highlight = Instance.new("Highlight")
     highlight.Name = "PlayerHighlightESP"
     highlight.Adornee = nil
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
+    highlight.FillTransparency = 0.65 
+    highlight.OutlineTransparency = 0.2 
     highlight.FillColor = Color3.fromRGB(0, 255, 0)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.Parent = CoreGui
     Highlights[player] = highlight
+
+    local boxFrame = Instance.new("Frame", SafeBoxGui)
+    boxFrame.BackgroundTransparency = 1
+    boxFrame.Visible = false
+
+    local boxStroke = Instance.new("UIStroke", boxFrame)
+    boxStroke.Thickness = 1.5
+    boxStroke.Color = Color3.fromRGB(0, 255, 0)
+
+    SafeBoxGuiList[player] = {Frame = boxFrame, Stroke = boxStroke}
 
     local function updateItems()
         if not ItemESP_Enabled or not ESPBillboards[player] then return end
@@ -249,10 +268,10 @@ local function createPlayerESP(player)
         local isExcluded = table.find(AimbotSettings.ExcludedPlayers, player.UserId) ~= nil
         if isExcluded then
             nameLabel.Text = player.Name .. " : team"
-            nameLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
+            nameLabel.TextColor3 = Color3.fromRGB(100, 255, 100) 
         else
             nameLabel.Text = player.Name .. " : enemy"
-            nameLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+            nameLabel.TextColor3 = Color3.fromRGB(255, 100, 100) 
         end
     end
 
@@ -317,6 +336,10 @@ Players.PlayerRemoving:Connect(function(player)
         Highlights[player]:Destroy()
         Highlights[player] = nil
     end
+    if SafeBoxGuiList[player] then
+        if SafeBoxGuiList[player].Frame then SafeBoxGuiList[player].Frame:Destroy() end
+        SafeBoxGuiList[player] = nil
+    end
 end)
 
 RunService.RenderStepped:Connect(function()
@@ -354,8 +377,39 @@ RunService.RenderStepped:Connect(function()
             hl.Enabled = false
         end
     end
+
+    for player, data in pairs(SafeBoxGuiList) do
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if char and hum and rootPart and hum.Health > 0 and BoxESP_Enabled then
+            local head = char:FindFirstChild("Head")
+            if head then
+                local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+                
+                if headOnScreen or legOnScreen then
+                    local height = math.abs(headPos.Y - legPos.Y)
+                    local width = height / 2
+                    
+                    data.Frame.Size = UDim2.new(0, width, 0, height)
+                    data.Frame.Position = UDim2.new(0, headPos.X - width / 2, 0, headPos.Y)
+                    data.Stroke.Color = getHealthColor(hum.Health, hum.MaxHealth)
+                    data.Frame.Visible = true
+                else
+                    data.Frame.Visible = false
+                end
+            else
+                data.Frame.Visible = false
+            end
+        else
+            data.Frame.Visible = false
+        end
+    end
 end)
 
+-- หน้าต่างเมนู UI หลักและการตั้งค่าต่างๆ
 if CoreGui:FindFirstChild("SimpleAimbotUI") then CoreGui.SimpleAimbotUI:Destroy() end
 if CoreGui:FindFirstChild("MobileFOVGui") then CoreGui.MobileFOVGui:Destroy() end
 if CoreGui:FindFirstChild("ExcludeMenuGui") then CoreGui.ExcludeMenuGui:Destroy() end
@@ -392,7 +446,7 @@ local TitleLabel = Instance.new("TextLabel", MainFrame)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0.05, 0, 0.03, 0)
 TitleLabel.Size = UDim2.new(0.9, 0, 0, 30)
-TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.Text = " Aimbot & ESP by FitHub "
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 18
@@ -425,7 +479,7 @@ local AimToggleBtn = Instance.new("TextButton", MainFrame)
 AimToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 AimToggleBtn.Position = UDim2.new(0.05, 0, 0.13, 0)
 AimToggleBtn.Size = UDim2.new(0, 145, 0, 35)
-AimToggleBtn.Font = Enum.Font.SourceSansBold
+AimToggleBtn.Font = Enum.Font.GothamBold
 AimToggleBtn.Text = "Aimbot: OFF (Q)"
 AimToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 AimToggleBtn.TextSize = 14
@@ -446,7 +500,7 @@ local StrongToggleBtn = Instance.new("TextButton", MainFrame)
 StrongToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 StrongToggleBtn.Position = UDim2.new(0.53, 0, 0.13, 0)
 StrongToggleBtn.Size = UDim2.new(0, 145, 0, 35)
-StrongToggleBtn.Font = Enum.Font.SourceSansBold
+StrongToggleBtn.Font = Enum.Font.GothamBold
 StrongToggleBtn.Text = "Strong Lock: OFF"
 StrongToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 StrongToggleBtn.TextSize = 14
@@ -467,7 +521,7 @@ local WallToggleBtn = Instance.new("TextButton", MainFrame)
 WallToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
 WallToggleBtn.Position = UDim2.new(0.05, 0, 0.25, 0)
 WallToggleBtn.Size = UDim2.new(0, 145, 0, 35)
-WallToggleBtn.Font = Enum.Font.SourceSansBold
+WallToggleBtn.Font = Enum.Font.GothamBold
 WallToggleBtn.Text = "Wallcheck: ON"
 WallToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallToggleBtn.TextSize = 14
@@ -488,7 +542,7 @@ local HideMyNameBtn = Instance.new("TextButton", MainFrame)
 HideMyNameBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
 HideMyNameBtn.Position = UDim2.new(0.53, 0, 0.25, 0)
 HideMyNameBtn.Size = UDim2.new(0, 145, 0, 35)
-HideMyNameBtn.Font = Enum.Font.SourceSansBold
+HideMyNameBtn.Font = Enum.Font.GothamBold
 HideMyNameBtn.Text = "Hide My Name: ON"
 HideMyNameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 HideMyNameBtn.TextSize = 14
@@ -509,7 +563,7 @@ local ESPToggleBtn = Instance.new("TextButton", MainFrame)
 ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
 ESPToggleBtn.Position = UDim2.new(0.05, 0, 0.37, 0)
 ESPToggleBtn.Size = UDim2.new(0, 145, 0, 35)
-ESPToggleBtn.Font = Enum.Font.SourceSansBold
+ESPToggleBtn.Font = Enum.Font.GothamBold
 ESPToggleBtn.Text = "Highlight ESP: ON"
 ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ESPToggleBtn.TextSize = 14
@@ -517,6 +571,7 @@ Instance.new("UICorner", ESPToggleBtn).CornerRadius = UDim.new(0, 8)
 
 ESPToggleBtn.MouseButton1Click:Connect(function()
     HighlightESP_Enabled = not HighlightESP_Enabled
+    BoxESP_Enabled = HighlightESP_Enabled
     if HighlightESP_Enabled then
         ESPToggleBtn.Text = "Highlight ESP: ON"
         ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
@@ -533,7 +588,7 @@ local CommonToggleBtn = Instance.new("TextButton", MainFrame)
 CommonToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
 CommonToggleBtn.Position = UDim2.new(0.53, 0, 0.37, 0)
 CommonToggleBtn.Size = UDim2.new(0, 145, 0, 35)
-CommonToggleBtn.Font = Enum.Font.SourceSansBold
+CommonToggleBtn.Font = Enum.Font.GothamBold
 CommonToggleBtn.Text = "Hide Common: ON"
 CommonToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CommonToggleBtn.TextSize = 14
@@ -554,7 +609,7 @@ local FOVBox = Instance.new("TextBox", MainFrame)
 FOVBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 FOVBox.Position = UDim2.new(0.05, 0, 0.49, 0)
 FOVBox.Size = UDim2.new(0, 145, 0, 35)
-FOVBox.Font = Enum.Font.SourceSans
+FOVBox.Font = Enum.Font.Gotham
 FOVBox.Text = tostring(AimbotSettings.FOV)
 FOVBox.PlaceholderText = "FOV Size"
 FOVBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -574,7 +629,7 @@ local ExcludeBtn = Instance.new("TextButton", MainFrame)
 ExcludeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 ExcludeBtn.Position = UDim2.new(0.53, 0, 0.49, 0)
 ExcludeBtn.Size = UDim2.new(0, 145, 0, 35)
-ExcludeBtn.Font = Enum.Font.SourceSansBold
+ExcludeBtn.Font = Enum.Font.GothamBold
 ExcludeBtn.Text = "ไม่ล็อคเพื่อน"
 ExcludeBtn.TextColor3 = Color3.fromRGB(150, 180, 220)
 ExcludeBtn.TextSize = 14
@@ -584,7 +639,7 @@ local InspectMenuBtn = Instance.new("TextButton", MainFrame)
 InspectMenuBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 160)
 InspectMenuBtn.Position = UDim2.new(0.05, 0, 0.61, 0)
 InspectMenuBtn.Size = UDim2.new(0.9, 0, 0, 40)
-InspectMenuBtn.Font = Enum.Font.SourceSansBold
+InspectMenuBtn.Font = Enum.Font.GothamBold
 InspectMenuBtn.Text = "👥 เมนูลอบดูของคนในเซิร์ฟเวอร์"
 InspectMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 InspectMenuBtn.TextSize = 15
@@ -594,7 +649,7 @@ local GunModBtn = Instance.new("TextButton", MainFrame)
 GunModBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 160)
 GunModBtn.Position = UDim2.new(0.05, 0, 0.74, 0)
 GunModBtn.Size = UDim2.new(0.9, 0, 0, 40)
-GunModBtn.Font = Enum.Font.SourceSansBold
+GunModBtn.Font = Enum.Font.GothamBold
 GunModBtn.Text = "⚙️ เมนูปรับปืน"
 GunModBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 GunModBtn.TextSize = 15
@@ -617,7 +672,7 @@ local InspectorTitle = Instance.new("TextLabel", InspectorFrame)
 InspectorTitle.BackgroundTransparency = 1
 InspectorTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
 InspectorTitle.Size = UDim2.new(0.8, 0, 0, 30)
-InspectorTitle.Font = Enum.Font.SourceSansBold
+InspectorTitle.Font = Enum.Font.GothamBold
 InspectorTitle.Text = "รายการผู้เล่นและไอเทมในตัว"
 InspectorTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 InspectorTitle.TextSize = 16
@@ -628,7 +683,7 @@ InspectorCloseBtn.Position = UDim2.new(0.85, 0, 0.04, 0)
 InspectorCloseBtn.Size = UDim2.new(0, 25, 0, 25)
 InspectorCloseBtn.Text = "X"
 InspectorCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-InspectorCloseBtn.Font = Enum.Font.SourceSansBold
+InspectorCloseBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", InspectorCloseBtn).CornerRadius = UDim.new(1, 0)
 InspectorCloseBtn.MouseButton1Click:Connect(function()
     PlayerInspectorGui.Enabled = false
@@ -661,7 +716,7 @@ local function refreshInspectorList()
             nameLbl.BackgroundTransparency = 1
             nameLbl.Position = UDim2.new(0.03, 0, 0.05, 0)
             nameLbl.Size = UDim2.new(0.94, 0, 0, 20)
-            nameLbl.Font = Enum.Font.SourceSansBold
+            nameLbl.Font = Enum.Font.GothamBold
             nameLbl.TextSize = 14
             nameLbl.Text = player.Name
             nameLbl.TextColor3 = Color3.fromRGB(100, 200, 255)
@@ -671,7 +726,7 @@ local function refreshInspectorList()
             itemsLbl.BackgroundTransparency = 1
             itemsLbl.Position = UDim2.new(0.03, 0, 0.35, 0)
             itemsLbl.Size = UDim2.new(0.94, 0, 0, 35)
-            itemsLbl.Font = Enum.Font.SourceSans
+            itemsLbl.Font = Enum.Font.Gotham
             itemsLbl.TextSize = 12
             itemsLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
             itemsLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -734,7 +789,7 @@ local ExcludeTitle = Instance.new("TextLabel", ExcludeFrame)
 ExcludeTitle.BackgroundTransparency = 1
 ExcludeTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
 ExcludeTitle.Size = UDim2.new(0.9, 0, 0, 30)
-ExcludeTitle.Font = Enum.Font.SourceSansBold
+ExcludeTitle.Font = Enum.Font.GothamBold
 ExcludeTitle.Text = "Select Player to Exclude"
 ExcludeTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 ExcludeTitle.TextSize = 16
@@ -745,7 +800,7 @@ ExcludeCloseBtn.Position = UDim2.new(0.85, 0, 0.04, 0)
 ExcludeCloseBtn.Size = UDim2.new(0, 25, 0, 25)
 ExcludeCloseBtn.Text = "X"
 ExcludeCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ExcludeCloseBtn.Font = Enum.Font.SourceSansBold
+ExcludeCloseBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", ExcludeCloseBtn).CornerRadius = UDim.new(1, 0)
 ExcludeCloseBtn.MouseButton1Click:Connect(function()
     ExcludeMenuGui.Enabled = false
@@ -773,7 +828,7 @@ local function refreshPlayerList()
         if player ~= LocalPlayer then
             local pBtn = Instance.new("TextButton", ScrollingContainer)
             pBtn.Size = UDim2.new(1, 0, 0, 35)
-            pBtn.Font = Enum.Font.SourceSansBold
+            pBtn.Font = Enum.Font.GothamBold
             pBtn.TextSize = 14
             Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 6)
             
@@ -826,7 +881,7 @@ local GunModTitle = Instance.new("TextLabel", GunModFrame)
 GunModTitle.BackgroundTransparency = 1
 GunModTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
 GunModTitle.Size = UDim2.new(0.9, 0, 0, 30)
-GunModTitle.Font = Enum.Font.SourceSansBold
+GunModTitle.Font = Enum.Font.GothamBold
 GunModTitle.Text = "ปรับแต่งอาวุธ"
 GunModTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 GunModTitle.TextSize = 16
@@ -837,7 +892,7 @@ GunModCloseBtn.Position = UDim2.new(0.85, 0, 0.04, 0)
 GunModCloseBtn.Size = UDim2.new(0, 25, 0, 25)
 GunModCloseBtn.Text = "X"
 GunModCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-GunModCloseBtn.Font = Enum.Font.SourceSansBold
+GunModCloseBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", GunModCloseBtn).CornerRadius = UDim.new(1, 0)
 GunModCloseBtn.MouseButton1Click:Connect(function()
     GunModMenuGui.Enabled = false
@@ -883,7 +938,7 @@ local ToggleGunMod = Instance.new("TextButton", GunModFrame)
 ToggleGunMod.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 ToggleGunMod.Position = UDim2.new(0.05, 0, 0.16, 0)
 ToggleGunMod.Size = UDim2.new(0.9, 0, 0, 40)
-ToggleGunMod.Font = Enum.Font.SourceSansBold
+ToggleGunMod.Font = Enum.Font.GothamBold
 ToggleGunMod.Text = "Auto Mod: OFF"
 ToggleGunMod.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleGunMod.TextSize = 14
@@ -905,7 +960,7 @@ local function createSlider(title, min, max, defaultVal, yPos, callback)
     label.BackgroundTransparency = 1
     label.Position = UDim2.new(0.05, 0, yPos, -18)
     label.Size = UDim2.new(0.9, 0, 0, 15)
-    label.Font = Enum.Font.SourceSansBold
+    label.Font = Enum.Font.GothamBold
     label.Text = title .. ": " .. tostring(defaultVal)
     label.TextColor3 = Color3.fromRGB(200, 200, 200)
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -1127,11 +1182,6 @@ RunService.RenderStepped:Connect(function()
                 myHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
             end
         end
-        for _, descendant in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if descendant:IsA("BillboardGui") and descendant.Name ~= "HeadESP_Gui" and descendant.Name ~= "FootESP_Gui" then
-                descendant.Enabled = not AimbotSettings.HideMyNameOnly
-            end
-        end
     end
 
     local shouldLock = AimbotSettings.Enabled and AimbotSettings.IsAiming
@@ -1161,4 +1211,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Full Script: Case-Insensitive Rarity Colors Loaded!")
+print("Script with Slim & Higher Name ESP Loaded Successfully!")
