@@ -178,7 +178,7 @@ local function createPlayerESP(player)
     -- [ปรับแก้] เปลี่ยนฟอนต์ให้บางลง (Gotham ปกติ แทนที่จะเป็น GothamBold)
     nameLabel.Font = Enum.Font.Gotham
     -- [ปรับแก้] ลดขนาดตัวอักษรลงเหลือ 10 เพื่อความเล็กและอ่านง่าย
-    nameLabel.TextSize = 13
+    nameLabel.TextSize = 9
     nameLabel.TextStrokeTransparency = 0.4
     nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
@@ -194,7 +194,7 @@ local function createPlayerESP(player)
     itemsLabel.Size = UDim2.new(1, 0, 1, 0)
     itemsLabel.BackgroundTransparency = 1
     itemsLabel.Font = Enum.Font.Gotham
-    itemsLabel.TextSize = 13
+    itemsLabel.TextSize = 9
     itemsLabel.TextStrokeTransparency = 0.2
     itemsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     itemsLabel.TextXAlignment = Enum.TextXAlignment.Center
