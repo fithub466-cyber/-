@@ -387,11 +387,11 @@ RunService.RenderStepped:Connect(function()
             local head = char:FindFirstChild("Head")
             if head then
                 local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
-                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3.0, 0))
+                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3.5, 0))
                 
                 if headOnScreen or legOnScreen then
                     local height = math.abs(headPos.Y - legPos.Y)
-                    local width = height / 1.0
+                    local width = height / 1.5
                     
                     data.Frame.Size = UDim2.new(0, width, 0, height)
                     data.Frame.Position = UDim2.new(0, headPos.X - width / 2, 0, headPos.Y)
