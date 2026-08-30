@@ -42,14 +42,21 @@ local HighlightESP_Enabled = true
 local HideCommonItems = true 
 local WeaponDB = {}
 
+-- ชุดสีระดับไอเทม (รองรับตัวพิมพ์เล็ก-ใหญ่)
 local RARITY_COLORS = {
-    ["Common"] = Color3.fromRGB(255, 255, 255),
-    ["Uncommon"] = Color3.fromRGB(99, 255, 52),
-    ["Rare"] = Color3.fromRGB(51, 170, 255),
-    ["Epic"] = Color3.fromRGB(237, 44, 255),
-    ["Legendary"] = Color3.fromRGB(255, 150, 0),
-    ["Omega"] = Color3.fromRGB(255, 20, 51),
+    ["common"] = Color3.fromRGB(160, 160, 160),       -- สีเทา
+    ["uncommon"] = Color3.fromRGB(50, 220, 50),     -- สีเขียว
+    ["rare"] = Color3.fromRGB(50, 150, 255),        -- สีฟ้า/น้ำเงิน
+    ["epic"] = Color3.fromRGB(180, 50, 255),        -- สีม่วง
+    ["legendary"] = Color3.fromRGB(255, 170, 0),     -- สีส้ม/ทอง
+    ["default"] = Color3.fromRGB(255, 255, 255)     -- สีขาว
 }
+
+local function getRarityColor(rarityStr)
+    if not rarityStr then return RARITY_COLORS["default"] end
+    local lowerKey = string.lower(tostring(rarityStr))
+    return RARITY_COLORS[lowerKey] or RARITY_COLORS["default"]
+end
 
 local AimbotSettings = {
     Enabled = false,
@@ -87,7 +94,7 @@ local function generateUniqueKey(tool)
     end
     local displayName = tool:GetAttribute("DisplayName") or tool.Name
     local toolName = tool.Name
-    local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Unknown"
+    local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Default"
     return "NAME_" .. displayName .. "_" .. toolName .. "_" .. rarity
 end
 
@@ -97,7 +104,7 @@ local function registerItems(folder)
         local key = generateUniqueKey(tool)
         if not key then continue end
         local displayName = tool:GetAttribute("DisplayName") or tool.Name
-        local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Common"
+        local rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Default"
         WeaponDB[key] = {
             Name = displayName,
             Rarity = rarity,
@@ -123,25 +130,18 @@ local function getWeaponInfo(tool)
     local key = generateUniqueKey(tool)
     return WeaponDB[key] or {
         Name = tool.Name,
-        Rarity = tool:GetAttribute("RarityName") or tool:GetAttribute("Rarity") or "Common",
+        Rarity = "Default",
         ToolName = tool.Name,
         Key = key
     }
 end
 
-if CoreGui:FindFirstChild("ItemESP_ScreenGui") then
-    CoreGui.ItemESP_ScreenGui:Destroy()
-end
 for _, v in ipairs(CoreGui:GetChildren()) do
-    if v.Name == "PlayerHighlightESP" then v:Destroy() end
+    if v.Name == "PlayerHighlightESP" or v.Name == "ItemESP_ScreenGui" or v.Name == "HeadESP_Gui" or v.Name == "FootESP_Gui" then v:Destroy() end
 end
 
-local ItemGui = Instance.new("ScreenGui", CoreGui)
-ItemGui.Name = "ItemESP_ScreenGui"
-ItemGui.IgnoreGuiInset = true
-
-local ItemFrames = {}
 local Highlights = {}
+local ESPBillboards = {}
 
 local function getHealthColor(health, maxHealth)
     local pct = math.clamp(health / maxHealth, 0, 1)
@@ -155,24 +155,48 @@ local function getHealthColor(health, maxHealth)
 end
 
 local function createPlayerESP(player)
-    if player == LocalPlayer or ItemFrames[player] then return end
+    if player == LocalPlayer or ESPBillboards[player] then return end
 
-    local containerFrame = Instance.new("Frame", ItemGui)
-    containerFrame.Name = "ItemContainer_" .. player.Name
-    containerFrame.Size = UDim2.new(0, 200, 0, 150)
-    containerFrame.AnchorPoint = Vector2.new(0.5, 1)
-    containerFrame.BackgroundTransparency = 1
-    containerFrame.Visible = false
+    local headBillboard = Instance.new("BillboardGui")
+    headBillboard.Name = "HeadESP_Gui"
+    headBillboard.Size = UDim2.new(0, 200, 0, 30)
+    headBillboard.StudsOffset = Vector3.new(0, 2.2, 0)
+    headBillboard.AlwaysOnTop = true
+    headBillboard.Enabled = false
 
-    local layout = Instance.new("UIListLayout", containerFrame)
-    layout.Padding = UDim.new(0, 1)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    local nameLabel = Instance.new("TextLabel", headBillboard)
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.TextSize = 13
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
-    ItemFrames[player] = {
-        Frame = containerFrame,
-        Tools = {}
+    local footBillboard = Instance.new("BillboardGui")
+    footBillboard.Name = "FootESP_Gui"
+    footBillboard.Size = UDim2.new(0, 250, 0, 40)
+    footBillboard.StudsOffset = Vector3.new(0, -3.2, 0)
+    footBillboard.AlwaysOnTop = true
+    footBillboard.Enabled = false
+
+    local itemsLabel = Instance.new("TextLabel", footBillboard)
+    itemsLabel.Name = "ItemsLabel"
+    itemsLabel.Size = UDim2.new(1, 0, 1, 0)
+    itemsLabel.BackgroundTransparency = 1
+    itemsLabel.Font = Enum.Font.SourceSansBold
+    itemsLabel.TextSize = 11
+    itemsLabel.TextStrokeTransparency = 0
+    itemsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    itemsLabel.TextXAlignment = Enum.TextXAlignment.Center
+    itemsLabel.TextYAlignment = Enum.TextYAlignment.Center
+    itemsLabel.TextWrapped = true
+
+    ESPBillboards[player] = {
+        HeadGui = headBillboard,
+        FootGui = footBillboard,
+        NameLbl = nameLabel,
+        ItemsLbl = itemsLabel
     }
 
     local highlight = Instance.new("Highlight")
@@ -186,12 +210,8 @@ local function createPlayerESP(player)
     Highlights[player] = highlight
 
     local function updateItems()
-        if not ItemESP_Enabled or not ItemFrames[player] then return end
-        local frame = ItemFrames[player].Frame
-        for _, child in ipairs(frame:GetChildren()) do
-            if child:IsA("TextLabel") then child:Destroy() end
-        end
-
+        if not ItemESP_Enabled or not ESPBillboards[player] then return end
+        
         local currentTools = {}
         local function scan(folder)
             if not folder then return end
@@ -199,7 +219,8 @@ local function createPlayerESP(player)
                 if tool:IsA("Tool") and tool.Name ~= "Fists" then
                     local info = getWeaponInfo(tool)
                     if info then
-                        if not (HideCommonItems and info.Rarity == "Common") then
+                        local rLower = string.lower(tostring(info.Rarity))
+                        if not (HideCommonItems and (rLower == "common" or rLower == "default")) then
                             table.insert(currentTools, info)
                         end
                     end
@@ -214,59 +235,55 @@ local function createPlayerESP(player)
             if backpack then scan(backpack) end
         end
 
-        for i, info in ipairs(currentTools) do
-            local txt = Instance.new("TextLabel")
-            txt.Parent = frame
-            txt.Size = UDim2.new(1, 0, 0, 11)
-            txt.BackgroundTransparency = 1
-            txt.Font = Enum.Font.SourceSansBold
-            txt.TextSize = 9
-            txt.Text = "[" .. tostring(info.Name) .. "]"
-            txt.LayoutOrder = i + 1
-
-            local color = RARITY_COLORS[info.Rarity] or Color3.fromRGB(255, 255, 255)
-            txt.TextColor3 = color
-            
-            local stroke = Instance.new("UIStroke")
-            stroke.Color = Color3.fromRGB(0, 0, 0)
-            stroke.Thickness = 1
-            stroke.Parent = txt
+        if #currentTools > 0 then
+            local itemNames = {}
+            for _, info in ipairs(currentTools) do
+                table.insert(itemNames, "[" .. tostring(info.Name) .. "]")
+            end
+            itemsLabel.Text = table.concat(itemNames, " ")
+            itemsLabel.TextColor3 = getRarityColor(currentTools[1].Rarity)
+        else
+            itemsLabel.Text = ""
         end
 
         local isExcluded = table.find(AimbotSettings.ExcludedPlayers, player.UserId) ~= nil
-        local statusText = Instance.new("TextLabel")
-        statusText.Parent = frame
-        statusText.Size = UDim2.new(1, 0, 0, 12)
-        statusText.BackgroundTransparency = 1
-        statusText.Font = Enum.Font.SourceSansBold
-        statusText.TextSize = 10
-        statusText.LayoutOrder = 0
-
         if isExcluded then
-            statusText.Text = player.Name .. " : team"
-            statusText.TextColor3 = Color3.fromRGB(50, 255, 50)
+            nameLabel.Text = player.Name .. " : team"
+            nameLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
         else
-            statusText.Text = player.Name .. " : enemy"
-            statusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+            nameLabel.Text = player.Name .. " : enemy"
+            nameLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
         end
-
-        local statusStroke = Instance.new("UIStroke")
-        statusStroke.Color = Color3.fromRGB(0, 0, 0)
-        statusStroke.Thickness = 1
-        statusStroke.Parent = statusText
     end
 
     local function bindCharacter(char)
         if not char then return end
+        local head = char:WaitForChild("Head", 5)
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        
+        if head then
+            headBillboard.Adornee = head
+            headBillboard.Parent = head
+            headBillboard.Enabled = ItemESP_Enabled
+        end
+
+        if root then
+            footBillboard.Adornee = root
+            footBillboard.Parent = root
+            footBillboard.Enabled = ItemESP_Enabled
+        end
+
         updateItems()
         if Highlights[player] then
             Highlights[player].Adornee = char
         end
+        
         local backpack = player:FindFirstChild("Backpack")
         if backpack then
             backpack.ChildAdded:Connect(updateItems)
             backpack.ChildRemoved:Connect(updateItems)
         end
+        
         char.ChildAdded:Connect(function(child)
             if child:IsA("Tool") then task.defer(updateItems) end
         end)
@@ -283,49 +300,40 @@ for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then createPlayerESP(p) end
 end
 
--- [[ เพิ่มระบบดักจับและสร้าง ESP ให้ผู้เล่นใหม่ที่เข้ามาทันที ]]
 Players.PlayerAdded:Connect(function(p)
     if p ~= LocalPlayer then
-        task.wait(1) -- หน่วงเวลารอให้ตัวละครโหลดเสร็จ
+        task.wait(1)
         createPlayerESP(p)
     end
 end)
 
-Players.PlayerRemoving:Connect(function(p)
-    if ItemFrames[p] then
-        ItemFrames[p].Frame:Destroy()
-        ItemFrames[p] = nil
+Players.PlayerRemoving:Connect(function(player)
+    if ESPBillboards[player] then
+        if ESPBillboards[player].HeadGui then ESPBillboards[player].HeadGui:Destroy() end
+        if ESPBillboards[player].FootGui then ESPBillboards[player].FootGui:Destroy() end
+        ESPBillboards[player] = nil
     end
-    if Highlights[p] then
-        Highlights[p]:Destroy()
-        Highlights[p] = nil
+    if Highlights[player] then
+        Highlights[player]:Destroy()
+        Highlights[player] = nil
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    if ItemESP_Enabled then
-        for player, data in pairs(ItemFrames) do
-            local char = player.Character
-            if char and char:FindFirstChild("Head") then
-                local head = char.Head
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                
-                if hum and hum.Health > 0 then
-                    local headPos3D = head.Position + Vector3.new(0, 2.2, 0)
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(headPos3D)
-
-                    if onScreen then
-                        data.Frame.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
-                        data.Frame.Visible = true
-                    else
-                        data.Frame.Visible = false
-                    end
-                else
-                    data.Frame.Visible = false
-                end
+    for player, data in pairs(ESPBillboards) do
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 and ItemESP_Enabled then
+                data.HeadGui.Enabled = true
+                data.FootGui.Enabled = true
             else
-                data.Frame.Visible = false
+                data.HeadGui.Enabled = false
+                data.FootGui.Enabled = false
             end
+        else
+            data.HeadGui.Enabled = false
+            data.FootGui.Enabled = false
         end
     end
 
@@ -540,13 +548,6 @@ CommonToggleBtn.MouseButton1Click:Connect(function()
         CommonToggleBtn.Text = "Hide Common: OFF"
         CommonToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     end
-    for _, data in pairs(ItemFrames) do
-        if data and data.Frame then
-            for _, child in ipairs(data.Frame:GetChildren()) do
-                if child:IsA("TextLabel") then child:Destroy() end
-            end
-        end
-    end
 end)
 
 local FOVBox = Instance.new("TextBox", MainFrame)
@@ -684,7 +685,10 @@ local function refreshInspectorList()
                     if tool:IsA("Tool") and tool.Name ~= "Fists" then
                         local info = getWeaponInfo(tool)
                         if info then
-                            table.insert(foundItems, info.Name)
+                            local rLower = string.lower(tostring(info.Rarity))
+                            if not (HideCommonItems and (rLower == "common" or rLower == "default")) then
+                                table.insert(foundItems, info.Name)
+                            end
                         end
                     end
                 end
@@ -699,7 +703,7 @@ local function refreshInspectorList()
             if #foundItems > 0 then
                 itemsLbl.Text = table.concat(foundItems, ", ")
             else
-                itemsLbl.Text = "Items: (ไม่มีไอเทม)"
+                itemsLbl.Text = "Items: (ไม่มีไอเทมเกรดสูง)"
             end
         end
     end
@@ -792,14 +796,6 @@ local function refreshPlayerList()
                     table.insert(AimbotSettings.ExcludedPlayers, player.UserId)
                 end
                 refreshPlayerList()
-                
-                for p, data in pairs(ItemFrames) do
-                    if data and data.Frame then
-                        for _, child in ipairs(data.Frame:GetChildren()) do
-                            if child:IsA("TextLabel") then child:Destroy() end
-                        end
-                    end
-                end
             end)
         end
     end
@@ -1132,7 +1128,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
         for _, descendant in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if descendant:IsA("BillboardGui") and descendant.Name ~= "ItemESP" then
+            if descendant:IsA("BillboardGui") and descendant.Name ~= "HeadESP_Gui" and descendant.Name ~= "FootESP_Gui" then
                 descendant.Enabled = not AimbotSettings.HideMyNameOnly
             end
         end
@@ -1165,4 +1161,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Mobile Highlight ESP (Head Position Fixed & Auto PlayerAdded) Loaded!")
+print("Full Script: Case-Insensitive Rarity Colors Loaded!")
