@@ -51,6 +51,18 @@ local RARITY_COLORS = {
     ["Omega"] = Color3.fromRGB(255, 20, 51),
 }
 
+local AimbotSettings = {
+    Enabled = false,
+    StrongLock = false,
+    WallCheck = true,
+    LockPart = "Head",
+    FOV = 160,
+    ShowFOV = true,
+    HideMyNameOnly = true,
+    IsAiming = false,
+    ExcludedPlayers = {}
+}
+
 local function generateUniqueKey(tool)
     if not tool or not tool:IsA("Tool") then return nil end
     local itemId = tool:GetAttribute("ItemId") or tool:GetAttribute("Id")
@@ -134,11 +146,11 @@ local Highlights = {}
 local function getHealthColor(health, maxHealth)
     local pct = math.clamp(health / maxHealth, 0, 1)
     if pct > 0.6 then
-        return Color3.fromRGB(0, 255, 0) -- เขียว
+        return Color3.fromRGB(0, 255, 0)
     elseif pct > 0.3 then
-        return Color3.fromRGB(255, 255, 0) -- เหลือง
+        return Color3.fromRGB(255, 255, 0)
     else
-        return Color3.fromRGB(255, 0, 0) -- แดง
+        return Color3.fromRGB(255, 0, 0)
     end
 end
 
@@ -148,14 +160,14 @@ local function createPlayerESP(player)
     local containerFrame = Instance.new("Frame", ItemGui)
     containerFrame.Name = "ItemContainer_" .. player.Name
     containerFrame.Size = UDim2.new(0, 200, 0, 150)
-    containerFrame.AnchorPoint = Vector2.new(0.5, 0)
+    containerFrame.AnchorPoint = Vector2.new(0.5, 1)
     containerFrame.BackgroundTransparency = 1
     containerFrame.Visible = false
 
     local layout = Instance.new("UIListLayout", containerFrame)
     layout.Padding = UDim.new(0, 1)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.VerticalAlignment = Enum.VerticalAlignment.Top
+    layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
     layout.SortOrder = Enum.SortOrder.LayoutOrder
 
     ItemFrames[player] = {
@@ -210,7 +222,7 @@ local function createPlayerESP(player)
             txt.Font = Enum.Font.SourceSansBold
             txt.TextSize = 9
             txt.Text = "[" .. tostring(info.Name) .. "]"
-            txt.LayoutOrder = i
+            txt.LayoutOrder = i + 1
 
             local color = RARITY_COLORS[info.Rarity] or Color3.fromRGB(255, 255, 255)
             txt.TextColor3 = color
@@ -220,6 +232,28 @@ local function createPlayerESP(player)
             stroke.Thickness = 1
             stroke.Parent = txt
         end
+
+        local isExcluded = table.find(AimbotSettings.ExcludedPlayers, player.UserId) ~= nil
+        local statusText = Instance.new("TextLabel")
+        statusText.Parent = frame
+        statusText.Size = UDim2.new(1, 0, 0, 12)
+        statusText.BackgroundTransparency = 1
+        statusText.Font = Enum.Font.SourceSansBold
+        statusText.TextSize = 10
+        statusText.LayoutOrder = 0
+
+        if isExcluded then
+            statusText.Text = player.Name .. " : team"
+            statusText.TextColor3 = Color3.fromRGB(50, 255, 50)
+        else
+            statusText.Text = player.Name .. " : enemy"
+            statusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+        end
+
+        local statusStroke = Instance.new("UIStroke")
+        statusStroke.Color = Color3.fromRGB(0, 0, 0)
+        statusStroke.Thickness = 1
+        statusStroke.Parent = statusText
     end
 
     local function bindCharacter(char)
@@ -248,9 +282,15 @@ end
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then createPlayerESP(p) end
 end
+
+-- [[ เพิ่มระบบดักจับและสร้าง ESP ให้ผู้เล่นใหม่ที่เข้ามาทันที ]]
 Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then createPlayerESP(p) end
+    if p ~= LocalPlayer then
+        task.wait(1) -- หน่วงเวลารอให้ตัวละครโหลดเสร็จ
+        createPlayerESP(p)
+    end
 end)
+
 Players.PlayerRemoving:Connect(function(p)
     if ItemFrames[p] then
         ItemFrames[p].Frame:Destroy()
@@ -263,17 +303,16 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 RunService.RenderStepped:Connect(function()
-    -- อัปเดตตำแหน่ง Item ESP
     if ItemESP_Enabled then
         for player, data in pairs(ItemFrames) do
             local char = player.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local root = char.HumanoidRootPart
+            if char and char:FindFirstChild("Head") then
+                local head = char.Head
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 
                 if hum and hum.Health > 0 then
-                    local footPos3D = root.Position - Vector3.new(0, 3.2, 0)
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(footPos3D)
+                    local headPos3D = head.Position + Vector3.new(0, 2.2, 0)
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(headPos3D)
 
                     if onScreen then
                         data.Frame.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
@@ -290,7 +329,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- อัปเดตสีและความสว่างของ Highlight ตามเลือด
     for player, hl in pairs(Highlights) do
         local char = player.Character
         if char and char:FindFirstChildOfClass("Humanoid") and HighlightESP_Enabled then
@@ -309,18 +347,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
-local AimbotSettings = {
-    Enabled = false,
-    StrongLock = false,
-    WallCheck = true,
-    LockPart = "Head",
-    FOV = 160,
-    ShowFOV = true,
-    HideMyNameOnly = true,
-    IsAiming = false,
-    ExcludedPlayers = {}
-}
 
 if CoreGui:FindFirstChild("SimpleAimbotUI") then CoreGui.SimpleAimbotUI:Destroy() end
 if CoreGui:FindFirstChild("MobileFOVGui") then CoreGui.MobileFOVGui:Destroy() end
@@ -558,7 +584,7 @@ InspectMenuBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 160)
 InspectMenuBtn.Position = UDim2.new(0.05, 0, 0.61, 0)
 InspectMenuBtn.Size = UDim2.new(0.9, 0, 0, 40)
 InspectMenuBtn.Font = Enum.Font.SourceSansBold
-InspectMenuBtn.Text = "เมนูดูของคนในเซิร์ฟเวอร์"
+InspectMenuBtn.Text = "👥 เมนูลอบดูของคนในเซิร์ฟเวอร์"
 InspectMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 InspectMenuBtn.TextSize = 15
 Instance.new("UICorner", InspectMenuBtn).CornerRadius = UDim.new(0, 8)
@@ -766,6 +792,14 @@ local function refreshPlayerList()
                     table.insert(AimbotSettings.ExcludedPlayers, player.UserId)
                 end
                 refreshPlayerList()
+                
+                for p, data in pairs(ItemFrames) do
+                    if data and data.Frame then
+                        for _, child in ipairs(data.Frame:GetChildren()) do
+                            if child:IsA("TextLabel") then child:Destroy() end
+                        end
+                    end
+                end
             end)
         end
     end
@@ -1131,4 +1165,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Mobile Highlight ESP with Health Color Loaded Successfully!")
+print("Mobile Highlight ESP (Head Position Fixed & Auto PlayerAdded) Loaded!")
