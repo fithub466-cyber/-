@@ -178,7 +178,7 @@ local function createPlayerESP(player)
     -- [ปรับแก้] เปลี่ยนฟอนต์ให้บางลง (Gotham ปกติ แทนที่จะเป็น GothamBold)
     nameLabel.Font = Enum.Font.Gotham
     -- [ปรับแก้] ลดขนาดตัวอักษรลงเหลือ 10 เพื่อความเล็กและอ่านง่าย
-    nameLabel.TextSize = 10
+    nameLabel.TextSize = 13
     nameLabel.TextStrokeTransparency = 0.4
     nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
@@ -193,8 +193,8 @@ local function createPlayerESP(player)
     itemsLabel.Name = "ItemsLabel"
     itemsLabel.Size = UDim2.new(1, 0, 1, 0)
     itemsLabel.BackgroundTransparency = 1
-    itemsLabel.Font = Enum.Font.GothamBold
-    itemsLabel.TextSize = 11
+    itemsLabel.Font = Enum.Font.Gotham
+    itemsLabel.TextSize = 13
     itemsLabel.TextStrokeTransparency = 0.2
     itemsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     itemsLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -387,11 +387,11 @@ RunService.RenderStepped:Connect(function()
             local head = char:FindFirstChild("Head")
             if head then
                 local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3.5, 0))
                 
                 if headOnScreen or legOnScreen then
                     local height = math.abs(headPos.Y - legPos.Y)
-                    local width = height / 2
+                    local width = height / 2.5
                     
                     data.Frame.Size = UDim2.new(0, width, 0, height)
                     data.Frame.Position = UDim2.new(0, headPos.X - width / 2, 0, headPos.Y)
