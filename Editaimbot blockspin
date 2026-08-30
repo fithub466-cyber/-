@@ -166,8 +166,7 @@ local function createPlayerESP(player)
     local headBillboard = Instance.new("BillboardGui")
     headBillboard.Name = "HeadESP_Gui"
     headBillboard.Size = UDim2.new(0, 200, 0, 25)
-    -- [ปรับแก้] เพิ่มความสูงขึ้นจากเดิมเล็กน้อยเพื่อให้ดูโปร่งขึ้น
-    headBillboard.StudsOffset = Vector3.new(0, 3.0, 0)
+    headBillboard.StudsOffset = Vector3.new(0, 2.5, 0)
     headBillboard.AlwaysOnTop = true
     headBillboard.Enabled = false
 
@@ -175,9 +174,7 @@ local function createPlayerESP(player)
     nameLabel.Name = "NameLabel"
     nameLabel.Size = UDim2.new(1, 0, 1, 0)
     nameLabel.BackgroundTransparency = 1
-    -- [ปรับแก้] เปลี่ยนฟอนต์ให้บางลง (Gotham ปกติ แทนที่จะเป็น GothamBold)
     nameLabel.Font = Enum.Font.Gotham
-    -- [ปรับแก้] ลดขนาดตัวอักษรลงเหลือ 10 เพื่อความเล็กและอ่านง่าย
     nameLabel.TextSize = 9
     nameLabel.TextStrokeTransparency = 0.4
     nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -185,27 +182,27 @@ local function createPlayerESP(player)
     local footBillboard = Instance.new("BillboardGui")
     footBillboard.Name = "FootESP_Gui"
     footBillboard.Size = UDim2.new(0, 250, 0, 30)
-    footBillboard.StudsOffset = Vector3.new(0, -4.0, 0)
+    footBillboard.StudsOffset = Vector3.new(0, -3.5, 0)
     footBillboard.AlwaysOnTop = true
     footBillboard.Enabled = false
 
-    local itemsLabel = Instance.new("TextLabel", footBillboard)
-    itemsLabel.Name = "ItemsLabel"
-    itemsLabel.Size = UDim2.new(1, 0, 1, 0)
-    itemsLabel.BackgroundTransparency = 1
-    itemsLabel.Font = Enum.Font.Gotham
-    itemsLabel.TextSize = 9
-    itemsLabel.TextStrokeTransparency = 0.2
-    itemsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    itemsLabel.TextXAlignment = Enum.TextXAlignment.Center
-    itemsLabel.TextYAlignment = Enum.TextYAlignment.Center
-    itemsLabel.TextWrapped = true
+    -- ใช้ UIListLayout เรียงข้อความไอเทมแบบแนวนอน เพื่อให้แยกสีแต่ละชิ้นได้อิสระ
+    local itemsContainer = Instance.new("Frame", footBillboard)
+    itemsContainer.Name = "ItemsContainer"
+    itemsContainer.Size = UDim2.new(1, 0, 1, 0)
+    itemsContainer.BackgroundTransparency = 1
+
+    local listLayout = Instance.new("UIListLayout", itemsContainer)
+    listLayout.FillDirection = Enum.FillDirection.Horizontal
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    listLayout.Padding = UDim.new(0, 4)
 
     ESPBillboards[player] = {
         HeadGui = headBillboard,
         FootGui = footBillboard,
         NameLbl = nameLabel,
-        ItemsLbl = itemsLabel
+        ItemsContainer = itemsContainer
     }
 
     local highlight = Instance.new("Highlight")
@@ -223,7 +220,7 @@ local function createPlayerESP(player)
     boxFrame.Visible = false
 
     local boxStroke = Instance.new("UIStroke", boxFrame)
-    boxStroke.Thickness = 2.5
+    boxStroke.Thickness = 1.5
     boxStroke.Color = Color3.fromRGB(0, 255, 0)
 
     SafeBoxGuiList[player] = {Frame = boxFrame, Stroke = boxStroke}
@@ -231,6 +228,13 @@ local function createPlayerESP(player)
     local function updateItems()
         if not ItemESP_Enabled or not ESPBillboards[player] then return end
         
+        -- ล้างป้ายไอเทมเก่าออกก่อนสร้างใหม่
+        for _, child in ipairs(itemsContainer:GetChildren()) do
+            if child:IsA("TextLabel") then
+                child:Destroy()
+            end
+        end
+
         local currentTools = {}
         local function scan(folder)
             if not folder then return end
@@ -255,14 +259,18 @@ local function createPlayerESP(player)
         end
 
         if #currentTools > 0 then
-            local itemNames = {}
+            -- สร้าง TextLabel แยกทีละชิ้น เพื่อให้แต่ละชิ้นแสดงสีตามระดับความหายากของตัวเอง
             for _, info in ipairs(currentTools) do
-                table.insert(itemNames, "[" .. tostring(info.Name) .. "]")
+                local itemLbl = Instance.new("TextLabel", itemsContainer)
+                itemLbl.BackgroundTransparency = 1
+                itemLbl.Font = Enum.Font.Gotham
+                itemLbl.TextSize = 9
+                itemLbl.TextStrokeTransparency = 0.2
+                itemLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                itemLbl.TextColor3 = getRarityColor(info.Rarity)
+                itemLbl.Text = "[" .. tostring(info.Name) .. "]"
+                itemLbl.AutomaticSize = Enum.AutomaticSize.XY
             end
-            itemsLabel.Text = table.concat(itemNames, " ")
-            itemsLabel.TextColor3 = getRarityColor(currentTools[1].Rarity)
-        else
-            itemsLabel.Text = ""
         end
 
         local isExcluded = table.find(AimbotSettings.ExcludedPlayers, player.UserId) ~= nil
@@ -386,12 +394,12 @@ RunService.RenderStepped:Connect(function()
         if char and hum and rootPart and hum.Health > 0 and BoxESP_Enabled then
             local head = char:FindFirstChild("Head")
             if head then
-                local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.0, 0))
-                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 4.0, 0))
+                local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local legPos, legOnScreen = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
                 
                 if headOnScreen or legOnScreen then
                     local height = math.abs(headPos.Y - legPos.Y)
-                    local width = height / 1.8
+                    local width = height / 2
                     
                     data.Frame.Size = UDim2.new(0, width, 0, height)
                     data.Frame.Position = UDim2.new(0, headPos.X - width / 2, 0, headPos.Y)
@@ -1211,4 +1219,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Script with Slim & Higher Name ESP Loaded Successfully!")
+print("Fixed Item ESP Colors Loaded Successfully!")
